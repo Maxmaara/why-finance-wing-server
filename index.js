@@ -9,12 +9,23 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// In-memory "DB" (temporary; will move to Mongo later)
+// In-memory data (lost when server restarts)
 let transactions = [];
 let users = [];
 
+// ---------- HELPERS ----------
 function generateOtp() {
   return Math.floor(100000 + Math.random() * 900000).toString();
+}
+
+function makeSafeUser(user) {
+  return {
+    id: user.id,
+    email: user.email,
+    username: user.username,
+    isVerified: user.isVerified,
+    plan: user.plan || 'basic'
+  };
 }
 
 // ---------- EMAIL TRANSPORT ----------
@@ -49,7 +60,6 @@ app.post('/api/transactions', (req, res) => {
     description: req.body.description || '',
     accountId: req.body.accountId || 'default'
   };
-
   transactions.push(tx);
   res.status(201).json(tx);
 });
@@ -63,7 +73,6 @@ app.put('/api/transactions/:id', (req, res) => {
   if (idx === -1) return res.status(404).json({ message: 'Not found' });
 
   const existing = transactions[idx];
-
   const updated = {
     ...existing,
     date: req.body.date ?? existing.date,
@@ -76,7 +85,6 @@ app.put('/api/transactions/:id', (req, res) => {
     description: req.body.description ?? existing.description,
     accountId: req.body.accountId ?? existing.accountId
   };
-
   transactions[idx] = updated;
   res.json(updated);
 });
@@ -87,11 +95,7 @@ app.delete('/api/transactions/:id', (req, res) => {
 
   const id = req.params.id;
   const before = transactions.length;
-
-  transactions = transactions.filter(
-    (t) => !(t.id === id && t.userId === userId)
-  );
-
+  transactions = transactions.filter((t) => !(t.id === id && t.userId === userId));
   if (transactions.length === before) {
     return res.status(404).json({ message: 'Not found' });
   }
@@ -112,8 +116,8 @@ app.post('/api/users/request-otp', async (req, res) => {
       isVerified: false,
       otp: null,
       otpExpiresAt: null,
-      plan: 'basic',         // default plan
-      planSince: Date.now()  // track when plan started
+      // NEW: default plan
+      plan: 'basic'
     };
     users.push(user);
   }
@@ -193,15 +197,7 @@ app.post('/api/users/verify-otp', (req, res) => {
   user.otp = null;
   user.otpExpiresAt = null;
 
-  const safeUser = {
-    id: user.id,
-    email: user.email,
-    username: user.username,
-    isVerified: user.isVerified,
-    plan: user.plan || 'basic',
-    planSince: user.planSince || null
-  };
-  res.json(safeUser);
+  res.json(makeSafeUser(user));
 });
 
 app.post('/api/users/update-profile', (req, res) => {
@@ -211,29 +207,22 @@ app.post('/api/users/update-profile', (req, res) => {
 
   const user = users.find((u) => u.email === email);
   if (!user) return res.status(404).json({ message: 'User not found' });
-  user.username = username;
 
-  const safeUser = {
-    id: user.id,
-    email: user.email,
-    username: user.username,
-    isVerified: user.isVerified,
-    plan: user.plan || 'basic',
-    planSince: user.planSince || null
-  };
-  res.json(safeUser);
+  user.username = username;
+  res.json(makeSafeUser(user));
 });
 
 // ---------- PLAN SELECTION ----------
 app.post('/api/users/select-plan', (req, res) => {
   const email = (req.body.email || '').trim().toLowerCase();
-  const plan = (req.body.plan || '').trim().toLowerCase(); // 'basic' | 'pro' | 'enterprise'
+  const plan = (req.body.plan || '').trim().toLowerCase();
 
   if (!email || !plan) {
     return res.status(400).json({ message: 'Email and plan are required' });
   }
 
-  if (!['basic', 'pro', 'enterprise'].includes(plan)) {
+  const allowedPlans = ['basic', 'pro', 'enterprise'];
+  if (!allowedPlans.includes(plan)) {
     return res.status(400).json({ message: 'Invalid plan' });
   }
 
@@ -241,18 +230,7 @@ app.post('/api/users/select-plan', (req, res) => {
   if (!user) return res.status(404).json({ message: 'User not found' });
 
   user.plan = plan;
-  user.planSince = Date.now();
-
-  const safeUser = {
-    id: user.id,
-    email: user.email,
-    username: user.username,
-    isVerified: user.isVerified,
-    plan: user.plan,
-    planSince: user.planSince
-  };
-
-  res.json(safeUser);
+  res.json(makeSafeUser(user));
 });
 
 // ---------- SERVER START ----------
