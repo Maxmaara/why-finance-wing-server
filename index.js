@@ -27,12 +27,21 @@ const transporter = nodemailer.createTransport({
 
 // -------- TRANSACTIONS --------
 app.get('/api/transactions', (req, res) => {
-  res.json(transactions);
+  const userId = req.header('x-user-id');
+  if (!userId) return res.json([]); // not logged in → no data for now
+
+  const userTx = transactions.filter((t) => t.userId === userId);
+  res.json(userTx);
 });
 
+
 app.post('/api/transactions', (req, res) => {
+  const userId = req.header('x-user-id');
+  if (!userId) return res.status(401).json({ message: 'Missing user' });
+
   const tx = {
     id: Date.now().toString(),
+    userId, // 👈 important
     date: req.body.date || '',
     type: req.body.type === 'income' ? 'income' : 'expense',
     category: req.body.category || '',
@@ -44,12 +53,17 @@ app.post('/api/transactions', (req, res) => {
   res.status(201).json(tx);
 });
 
+
 app.put('/api/transactions/:id', (req, res) => {
+  const userId = req.header('x-user-id');
+  if (!userId) return res.status(401).json({ message: 'Missing user' });
+
   const id = req.params.id;
-  const idx = transactions.findIndex((t) => t.id === id);
+  const idx = transactions.findIndex((t) => t.id === id && t.userId === userId);
   if (idx === -1) return res.status(404).json({ message: 'Not found' });
 
   const existing = transactions[idx];
+  // ... rest stays same
   const updated = {
     ...existing,
     date: req.body.date ?? existing.date,
@@ -67,14 +81,18 @@ app.put('/api/transactions/:id', (req, res) => {
 });
 
 app.delete('/api/transactions/:id', (req, res) => {
+  const userId = req.header('x-user-id');
+  if (!userId) return res.status(401).json({ message: 'Missing user' });
+
   const id = req.params.id;
   const before = transactions.length;
-  transactions = transactions.filter((t) => t.id !== id);
+  transactions = transactions.filter((t) => !(t.id === id && t.userId === userId));
   if (transactions.length === before) {
     return res.status(404).json({ message: 'Not found' });
   }
   res.json({ ok: true });
 });
+
 
 // -------- USERS + OTP --------
 app.post('/api/users/request-otp', async (req, res) => {
