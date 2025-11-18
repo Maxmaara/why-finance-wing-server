@@ -1,4 +1,4 @@
-//desktop/budget-app/server/index.js
+// /desktop/budget-app/server/index.js
 
 const express = require('express');
 const cors = require('cors');
@@ -9,6 +9,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// In-memory "DB" (temporary; will move to Mongo later)
 let transactions = [];
 let users = [];
 
@@ -16,6 +17,7 @@ function generateOtp() {
   return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
+// ---------- EMAIL TRANSPORT ----------
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
@@ -24,16 +26,14 @@ const transporter = nodemailer.createTransport({
   }
 });
 
-
-// -------- TRANSACTIONS --------
+// ---------- TRANSACTIONS ----------
 app.get('/api/transactions', (req, res) => {
   const userId = req.header('x-user-id');
-  if (!userId) return res.json([]); // not logged in → no data for now
+  if (!userId) return res.json([]); // not logged in → no data
 
   const userTx = transactions.filter((t) => t.userId === userId);
   res.json(userTx);
 });
-
 
 app.post('/api/transactions', (req, res) => {
   const userId = req.header('x-user-id');
@@ -41,7 +41,7 @@ app.post('/api/transactions', (req, res) => {
 
   const tx = {
     id: Date.now().toString(),
-    userId, // 👈 important
+    userId,
     date: req.body.date || '',
     type: req.body.type === 'income' ? 'income' : 'expense',
     category: req.body.category || '',
@@ -49,10 +49,10 @@ app.post('/api/transactions', (req, res) => {
     description: req.body.description || '',
     accountId: req.body.accountId || 'default'
   };
+
   transactions.push(tx);
   res.status(201).json(tx);
 });
-
 
 app.put('/api/transactions/:id', (req, res) => {
   const userId = req.header('x-user-id');
@@ -63,7 +63,7 @@ app.put('/api/transactions/:id', (req, res) => {
   if (idx === -1) return res.status(404).json({ message: 'Not found' });
 
   const existing = transactions[idx];
-  // ... rest stays same
+
   const updated = {
     ...existing,
     date: req.body.date ?? existing.date,
@@ -76,6 +76,7 @@ app.put('/api/transactions/:id', (req, res) => {
     description: req.body.description ?? existing.description,
     accountId: req.body.accountId ?? existing.accountId
   };
+
   transactions[idx] = updated;
   res.json(updated);
 });
@@ -86,15 +87,18 @@ app.delete('/api/transactions/:id', (req, res) => {
 
   const id = req.params.id;
   const before = transactions.length;
-  transactions = transactions.filter((t) => !(t.id === id && t.userId === userId));
+
+  transactions = transactions.filter(
+    (t) => !(t.id === id && t.userId === userId)
+  );
+
   if (transactions.length === before) {
     return res.status(404).json({ message: 'Not found' });
   }
   res.json({ ok: true });
 });
 
-
-// -------- USERS + OTP --------
+// ---------- USERS + OTP ----------
 app.post('/api/users/request-otp', async (req, res) => {
   const email = (req.body.email || '').trim().toLowerCase();
   if (!email) return res.status(400).json({ message: 'Email required' });
@@ -107,7 +111,9 @@ app.post('/api/users/request-otp', async (req, res) => {
       username: '',
       isVerified: false,
       otp: null,
-      otpExpiresAt: null
+      otpExpiresAt: null,
+      plan: 'basic',         // default plan
+      planSince: Date.now()  // track when plan started
     };
     users.push(user);
   }
@@ -191,7 +197,9 @@ app.post('/api/users/verify-otp', (req, res) => {
     id: user.id,
     email: user.email,
     username: user.username,
-    isVerified: user.isVerified
+    isVerified: user.isVerified,
+    plan: user.plan || 'basic',
+    planSince: user.planSince || null
   };
   res.json(safeUser);
 });
@@ -209,13 +217,46 @@ app.post('/api/users/update-profile', (req, res) => {
     id: user.id,
     email: user.email,
     username: user.username,
-    isVerified: user.isVerified
+    isVerified: user.isVerified,
+    plan: user.plan || 'basic',
+    planSince: user.planSince || null
   };
   res.json(safeUser);
 });
 
+// ---------- PLAN SELECTION ----------
+app.post('/api/users/select-plan', (req, res) => {
+  const email = (req.body.email || '').trim().toLowerCase();
+  const plan = (req.body.plan || '').trim().toLowerCase(); // 'basic' | 'pro' | 'enterprise'
+
+  if (!email || !plan) {
+    return res.status(400).json({ message: 'Email and plan are required' });
+  }
+
+  if (!['basic', 'pro', 'enterprise'].includes(plan)) {
+    return res.status(400).json({ message: 'Invalid plan' });
+  }
+
+  const user = users.find((u) => u.email === email);
+  if (!user) return res.status(404).json({ message: 'User not found' });
+
+  user.plan = plan;
+  user.planSince = Date.now();
+
+  const safeUser = {
+    id: user.id,
+    email: user.email,
+    username: user.username,
+    isVerified: user.isVerified,
+    plan: user.plan,
+    planSince: user.planSince
+  };
+
+  res.json(safeUser);
+});
+
+// ---------- SERVER START ----------
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => {
   console.log(`API running on port ${PORT}`);
 });
-
