@@ -28,14 +28,10 @@ function makeSafeUser(user) {
   };
 }
 
-// ---------- EMAIL TRANSPORT ----------
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS
-  }
-});
+// ---------- RESEND EMAIL ----------
+const { Resend } = require('resend');
+const resend = new Resend(process.env.RESEND_API_KEY);
+
 
 // ---------- TRANSACTIONS ----------
 app.get('/api/transactions', (req, res) => {
@@ -127,8 +123,8 @@ app.post('/api/users/request-otp', async (req, res) => {
   user.otpExpiresAt = Date.now() + 10 * 60 * 1000; // 10 minutes
 
   try {
-    await transporter.sendMail({
-      from: '"Why? Community · Budget Tracker" <no-reply@whycommunity.org>',
+    await resend.emails.send({
+      from: '"Why? Community · Budget Tracker" <onboarding@resend.dev>',
       to: email,
       subject: 'Your Why? Community verification code',
       html: `
