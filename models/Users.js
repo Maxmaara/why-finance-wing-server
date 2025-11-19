@@ -2,30 +2,45 @@
 
 const mongoose = require('mongoose');
 
-const UserSchema = new mongoose.Schema({
-  email: { type: String, required: true, unique: true },
-  otp: String,
-  otpExpiresAt: Date,
-  isVerified: { type: Boolean, default: false },
-
-  plan: { type: String, default: 'basic' },
-  planSince: Date,
-  paymentStatus: { type: String, default: 'unpaid' },
-  paymentProvider: { type: String, default: 'none' },
-  paymentId: String,
-
-  incomeCategories: { type: [String], default: ['Salary','Bonus','Business','Other income'] },
-  expenseCategories: { type: [String], default: ['Rent','Groceries','Utilities','Transport','Other expense'] },
-
-  accounts: {
-    type: Array,
-    default: [
-      { id: 'acc-bank-1', name: 'Main Bank', currency: 'AED', type: 'bank', mandatory: true },
-      { id: 'acc-cash', name: 'Cash', currency: 'AED', type: 'cash', mandatory: true }
-    ]
+const AccountSchema = new mongoose.Schema(
+  {
+    id: String,
+    name: String,
+    currency: String,
+    type: String,      // 'bank' | 'cash' | 'savings'
+    mandatory: Boolean
   },
+  { _id: false }
+);
 
-  savingsAccounts: { type: Array, default: [] }
-});
+const UserSchema = new mongoose.Schema(
+  {
+    email: { type: String, required: true, unique: true },
+    isVerified: { type: Boolean, default: false },
+
+    otp: String,
+    otpExpiresAt: Date,
+
+    plan: { type: String, default: 'basic' }, // 'basic' | 'pro' | 'enterprise'
+    planSince: Date,
+
+    paymentStatus: { type: String, default: 'unpaid' }, // 'unpaid' | 'paid'
+    paymentProvider: String,
+    paymentId: String,
+
+    incomeCategories: {
+      type: [String],
+      default: ['Salary', 'Bonus', 'Business', 'Other income']
+    },
+    expenseCategories: {
+      type: [String],
+      default: ['Rent', 'Groceries', 'Utilities', 'Transport', 'Other expense']
+    },
+
+    accounts: { type: [AccountSchema], default: [] },
+    savingsAccounts: { type: [AccountSchema], default: [] }
+  },
+  { timestamps: true }
+);
 
 module.exports = mongoose.model('User', UserSchema);
