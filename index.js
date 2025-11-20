@@ -125,29 +125,52 @@ app.post('/api/transactions', async (req, res) => {
   res.status(201).json(tx);
 });
 
+// ---------- UPDATE TRANSACTION ----------
 app.put('/api/transactions/:id', async (req, res) => {
   const userId = req.header('x-user-id');
+  const { id } = req.params;
+
   if (!userId) return res.status(401).json({ message: 'Missing user' });
+  if (!id || id === 'undefined') {
+    return res.status(400).json({ message: 'Missing transaction id' });
+  }
 
-  const tx = await Transaction.findOneAndUpdate(
-    { _id: req.params.id, userId },
-    req.body,
-    { new: true }
-  );
+  try {
+    const tx = await Transaction.findOneAndUpdate(
+      { _id: id, userId },
+      req.body,
+      { new: true }
+    );
 
-  if (!tx) return res.status(404).json({ message: 'Not found' });
-  res.json(tx);
+    if (!tx) return res.status(404).json({ message: 'Not found' });
+    res.json(tx);
+  } catch (err) {
+    console.error('Update tx error:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
 });
 
+// ---------- DELETE TRANSACTION ----------
 app.delete('/api/transactions/:id', async (req, res) => {
   const userId = req.header('x-user-id');
+  const { id } = req.params;
+
   if (!userId) return res.status(401).json({ message: 'Missing user' });
+  if (!id || id === 'undefined') {
+    return res.status(400).json({ message: 'Missing transaction id' });
+  }
 
-  const found = await Transaction.findOneAndDelete({ _id: req.params.id, userId });
-  if (!found) return res.status(404).json({ message: 'Not found' });
+  try {
+    const found = await Transaction.findOneAndDelete({ _id: id, userId });
+    if (!found) return res.status(404).json({ message: 'Not found' });
 
-  res.json({ ok: true });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Delete tx error:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
 });
+
 
 // ---------- OTP REQUEST ----------
 app.post('/api/users/request-otp', async (req, res) => {
