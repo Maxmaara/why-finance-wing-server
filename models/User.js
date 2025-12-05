@@ -1,4 +1,4 @@
-//desktop/budget-app/server/models/User.js:
+// /desktop/budget-app/server/models/User.js
 
 const mongoose = require('mongoose');
 
@@ -7,7 +7,7 @@ const AccountSchema = new mongoose.Schema(
     id: String,
     name: String,
     currency: String,
-    type: String,      // 'bank' | 'cash' | 'savings'
+    type: String,
     mandatory: Boolean
   },
   { _id: false }
@@ -21,10 +21,12 @@ const UserSchema = new mongoose.Schema(
     otp: String,
     otpExpiresAt: Date,
 
-    plan: { type: String, default: 'basic' }, // 'basic' | 'pro' | 'enterprise'
+    username: { type: String, default: '' },
+
+    plan: { type: String, default: 'basic' },
     planSince: Date,
 
-    paymentStatus: { type: String, default: 'unpaid' }, // 'unpaid' | 'paid'
+    paymentStatus: { type: String, default: 'unpaid' },
     paymentProvider: String,
     paymentId: String,
 
@@ -35,6 +37,16 @@ const UserSchema = new mongoose.Schema(
     expenseCategories: {
       type: [String],
       default: ['Rent', 'Groceries', 'Utilities', 'Transport', 'Other expense']
+    },
+
+    // per-user investment meta (user controls, no defaults)
+    investmentTypes: {
+      type: [String],
+      default: []
+    },
+    investmentPlatforms: {
+      type: [String],
+      default: []
     },
 
     accounts: { type: [AccountSchema], default: [] },
